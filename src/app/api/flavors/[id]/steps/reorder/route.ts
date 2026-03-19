@@ -5,17 +5,17 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await params; // validate route param exists
+  await params;
   const supabase = createAdminClient();
   const body = await request.json();
 
-  // body.steps: [{ id: string, step_order: number }]
-  const updates = body.steps as { id: string; step_order: number }[];
+  // body.steps: [{ id: number, order_by: number }]
+  const updates = body.steps as { id: number; order_by: number }[];
 
   for (const step of updates) {
     const { error } = await supabase
       .from("humor_flavor_steps")
-      .update({ step_order: step.step_order })
+      .update({ order_by: step.order_by })
       .eq("id", step.id);
 
     if (error) {

@@ -2,28 +2,32 @@
 
 import { Nav } from "@/components/nav";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 interface HumorFlavor {
-  id: string;
+  id: number;
   slug: string;
   description: string | null;
   created_datetime_utc: string;
 }
 
 interface FlavorStep {
-  id: string;
-  humor_flavor_id: string;
-  step_order: number;
-  prompt_template: string | null;
+  id: number;
+  humor_flavor_id: number;
+  order_by: number;
+  llm_system_prompt: string | null;
+  llm_user_prompt: string | null;
   description: string | null;
-  llm_model_id: string | null;
+  llm_model_id: number | null;
+  llm_temperature: number | null;
+  llm_input_type_id: number | null;
+  llm_output_type_id: number | null;
+  humor_flavor_step_type_id: number | null;
 }
 
 export default function FlavorDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const [flavor, setFlavor] = useState<HumorFlavor | null>(null);
   const [steps, setSteps] = useState<FlavorStep[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,19 +38,23 @@ export default function FlavorDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Step editing
-  const [editingStep, setEditingStep] = useState<string | null>(null);
+  const [editingStep, setEditingStep] = useState<number | null>(null);
   const [stepForm, setStepForm] = useState({
-    prompt_template: "",
+    llm_system_prompt: "",
+    llm_user_prompt: "",
     description: "",
     llm_model_id: "",
+    llm_temperature: "0.7",
   });
 
   // New step form
   const [showNewStep, setShowNewStep] = useState(false);
   const [newStep, setNewStep] = useState({
-    prompt_template: "",
+    llm_system_prompt: "",
+    llm_user_prompt: "",
     description: "",
     llm_model_id: "",
+    llm_temperature: "0.7",
   });
 
   const loadData = useCallback(async () => {
@@ -57,9 +65,9 @@ export default function FlavorDetailPage() {
     const flavorData = await flavorRes.json();
     const stepsData = await stepsRes.json();
     setFlavor(flavorData);
-    setSlug(flavorData.slug);
+    setSlug(flavorData.slug || "");
     setDescription(flavorData.description || "");
-    setSteps(stepsData);
+    setSteps(Array.isArray(stepsData) ? stepsData : []);
     setLoading(false);
   }, [id]);
 
@@ -93,35 +101,47 @@ export default function FlavorDetailPage() {
     const res = await fetch(`/api/flavors/${id}/steps`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newStep),
+      body: JSON.stringify({
+        ...newStep,
+        llm_temperature: parseFloat(newStep.llm_temperature) || 0.7,
+      }),
     });
     if (res.ok) {
-      setNewStep({ prompt_template: "", description: "", llm_model_id: "" });
+      setNewStep({
+        llm_system_prompt: "",
+        llm_user_prompt: "",
+        description: "",
+        llm_model_id: "",
+        llm_temperature: "0.7",
+      });
       setShowNewStep(false);
       await loadData();
     }
     setSaving(false);
   }
 
-  async function handleUpdateStep(stepId: string) {
+  async function handleUpdateStep(stepId: number) {
     setSaving(true);
     await fetch(`/api/flavors/${id}/steps/${stepId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(stepForm),
+      body: JSON.stringify({
+        ...stepForm,
+        llm_temperature: parseFloat(stepForm.llm_temperature) || 0.7,
+      }),
     });
     setEditingStep(null);
     await loadData();
     setSaving(false);
   }
 
-  async function handleDeleteStep(stepId: string) {
+  async function handleDeleteStep(stepId: number) {
     if (!confirm("Delete this step?")) return;
     await fetch(`/api/flavors/${id}/steps/${stepId}`, { method: "DELETE" });
     await loadData();
   }
 
-  async function handleMoveStep(stepId: string, direction: "up" | "down") {
+  async function handleMoveStep(stepId: number, direction: "up" | "down") {
     const idx = steps.findIndex((s) => s.id === stepId);
     if (
       (direction === "up" && idx === 0) ||
@@ -132,12 +152,10 @@ export default function FlavorDetailPage() {
     const newSteps = [...steps];
     const swapIdx = direction === "up" ? idx - 1 : idx + 1;
 
-    // Swap step_order values
-    const tempOrder = newSteps[idx].step_order;
-    newSteps[idx].step_order = newSteps[swapIdx].step_order;
-    newSteps[swapIdx].step_order = tempOrder;
+    const tempOrder = newSteps[idx].order_by;
+    newSteps[idx].order_by = newSteps[swapIdx].order_by;
+    newSteps[swapIdx].order_by = tempOrder;
 
-    // Swap positions in array
     [newSteps[idx], newSteps[swapIdx]] = [newSteps[swapIdx], newSteps[idx]];
     setSteps(newSteps);
 
@@ -145,7 +163,7 @@ export default function FlavorDetailPage() {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        steps: newSteps.map((s) => ({ id: s.id, step_order: s.step_order })),
+        steps: newSteps.map((s) => ({ id: s.id, order_by: s.order_by })),
       }),
     });
   }
@@ -153,9 +171,11 @@ export default function FlavorDetailPage() {
   function startEditStep(step: FlavorStep) {
     setEditingStep(step.id);
     setStepForm({
-      prompt_template: step.prompt_template || "",
+      llm_system_prompt: step.llm_system_prompt || "",
+      llm_user_prompt: step.llm_user_prompt || "",
       description: step.description || "",
-      llm_model_id: step.llm_model_id || "",
+      llm_model_id: step.llm_model_id?.toString() || "",
+      llm_temperature: step.llm_temperature?.toString() || "0.7",
     });
   }
 
@@ -317,31 +337,61 @@ export default function FlavorDetailPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Prompt Template
+                  System Prompt
                 </label>
                 <textarea
-                  value={newStep.prompt_template}
+                  value={newStep.llm_system_prompt}
                   onChange={(e) =>
-                    setNewStep({ ...newStep, prompt_template: e.target.value })
+                    setNewStep({ ...newStep, llm_system_prompt: e.target.value })
                   }
-                  rows={4}
-                  placeholder="Enter the prompt template for this step..."
+                  rows={3}
+                  placeholder="System prompt for this step..."
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-mono"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  LLM Model ID (optional)
+                  User Prompt
                 </label>
-                <input
-                  type="text"
-                  value={newStep.llm_model_id}
+                <textarea
+                  value={newStep.llm_user_prompt}
                   onChange={(e) =>
-                    setNewStep({ ...newStep, llm_model_id: e.target.value })
+                    setNewStep({ ...newStep, llm_user_prompt: e.target.value })
                   }
-                  placeholder="UUID of the LLM model"
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  rows={4}
+                  placeholder="User prompt template for this step..."
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-mono"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    LLM Model ID
+                  </label>
+                  <input
+                    type="text"
+                    value={newStep.llm_model_id}
+                    onChange={(e) =>
+                      setNewStep({ ...newStep, llm_model_id: e.target.value })
+                    }
+                    placeholder="e.g. 1"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Temperature
+                  </label>
+                  <input
+                    type="text"
+                    value={newStep.llm_temperature}
+                    onChange={(e) =>
+                      setNewStep({ ...newStep, llm_temperature: e.target.value })
+                    }
+                    placeholder="0.7"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
               </div>
             </div>
             <button
@@ -369,10 +419,10 @@ export default function FlavorDetailPage() {
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-3">
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-sm font-bold text-blue-700 dark:text-blue-300">
-                      {step.step_order}
+                      {step.order_by}
                     </span>
                     <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {step.description || `Step ${step.step_order}`}
+                      {step.description || `Step ${step.order_by}`}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -438,12 +488,12 @@ export default function FlavorDetailPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Prompt Template
+                        System Prompt
                       </label>
                       <textarea
-                        value={stepForm.prompt_template}
+                        value={stepForm.llm_system_prompt}
                         onChange={(e) =>
-                          setStepForm({ ...stepForm, prompt_template: e.target.value })
+                          setStepForm({ ...stepForm, llm_system_prompt: e.target.value })
                         }
                         rows={4}
                         className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-mono"
@@ -451,16 +501,44 @@ export default function FlavorDetailPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        LLM Model ID
+                        User Prompt
                       </label>
-                      <input
-                        type="text"
-                        value={stepForm.llm_model_id}
+                      <textarea
+                        value={stepForm.llm_user_prompt}
                         onChange={(e) =>
-                          setStepForm({ ...stepForm, llm_model_id: e.target.value })
+                          setStepForm({ ...stepForm, llm_user_prompt: e.target.value })
                         }
-                        className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                        rows={6}
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-mono"
                       />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          LLM Model ID
+                        </label>
+                        <input
+                          type="text"
+                          value={stepForm.llm_model_id}
+                          onChange={(e) =>
+                            setStepForm({ ...stepForm, llm_model_id: e.target.value })
+                          }
+                          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Temperature
+                        </label>
+                        <input
+                          type="text"
+                          value={stepForm.llm_temperature}
+                          onChange={(e) =>
+                            setStepForm({ ...stepForm, llm_temperature: e.target.value })
+                          }
+                          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -479,19 +557,35 @@ export default function FlavorDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  step.prompt_template && (
-                    <div className="mt-2 rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
-                      <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono">
-                        {step.prompt_template}
-                      </pre>
-                    </div>
-                  )
+                  <>
+                    {step.llm_system_prompt && (
+                      <div className="mt-2">
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">System Prompt</p>
+                        <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                          <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono max-h-32 overflow-y-auto">
+                            {step.llm_system_prompt}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                    {step.llm_user_prompt && (
+                      <div className="mt-2">
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">User Prompt</p>
+                        <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                          <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono max-h-32 overflow-y-auto">
+                            {step.llm_user_prompt}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {step.llm_model_id && editingStep !== step.id && (
-                  <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                    Model: {step.llm_model_id}
-                  </p>
+                {editingStep !== step.id && (
+                  <div className="mt-2 flex gap-3 text-xs text-gray-400 dark:text-gray-500">
+                    {step.llm_model_id && <span>Model: {step.llm_model_id}</span>}
+                    {step.llm_temperature != null && <span>Temp: {step.llm_temperature}</span>}
+                  </div>
                 )}
               </div>
             ))}

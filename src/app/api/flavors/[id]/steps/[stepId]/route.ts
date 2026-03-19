@@ -10,10 +10,15 @@ export async function PATCH(
   const body = await request.json();
 
   const updates: Record<string, unknown> = {};
-  if (body.prompt_template !== undefined) updates.prompt_template = body.prompt_template;
+  if (body.llm_system_prompt !== undefined) updates.llm_system_prompt = body.llm_system_prompt;
+  if (body.llm_user_prompt !== undefined) updates.llm_user_prompt = body.llm_user_prompt;
   if (body.description !== undefined) updates.description = body.description;
-  if (body.step_order !== undefined) updates.step_order = body.step_order;
+  if (body.order_by !== undefined) updates.order_by = body.order_by;
   if (body.llm_model_id !== undefined) updates.llm_model_id = body.llm_model_id || null;
+  if (body.llm_temperature !== undefined) updates.llm_temperature = body.llm_temperature;
+  if (body.llm_input_type_id !== undefined) updates.llm_input_type_id = body.llm_input_type_id || null;
+  if (body.llm_output_type_id !== undefined) updates.llm_output_type_id = body.llm_output_type_id || null;
+  if (body.humor_flavor_step_type_id !== undefined) updates.humor_flavor_step_type_id = body.humor_flavor_step_type_id || null;
 
   const { data, error } = await supabase
     .from("humor_flavor_steps")

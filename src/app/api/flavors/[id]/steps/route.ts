@@ -11,7 +11,7 @@ export async function GET(
     .from("humor_flavor_steps")
     .select("*")
     .eq("humor_flavor_id", id)
-    .order("step_order", { ascending: true });
+    .order("order_by", { ascending: true });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -27,24 +27,29 @@ export async function POST(
   const supabase = createAdminClient();
   const body = await request.json();
 
-  // Get max step_order for this flavor
+  // Get max order_by for this flavor
   const { data: existing } = await supabase
     .from("humor_flavor_steps")
-    .select("step_order")
+    .select("order_by")
     .eq("humor_flavor_id", id)
-    .order("step_order", { ascending: false })
+    .order("order_by", { ascending: false })
     .limit(1);
 
-  const nextOrder = existing && existing.length > 0 ? existing[0].step_order + 1 : 1;
+  const nextOrder = existing && existing.length > 0 ? existing[0].order_by + 1 : 1;
 
   const { data, error } = await supabase
     .from("humor_flavor_steps")
     .insert({
       humor_flavor_id: id,
-      step_order: body.step_order ?? nextOrder,
-      prompt_template: body.prompt_template,
+      order_by: body.order_by ?? nextOrder,
+      llm_system_prompt: body.llm_system_prompt,
+      llm_user_prompt: body.llm_user_prompt,
       description: body.description,
       llm_model_id: body.llm_model_id || null,
+      llm_temperature: body.llm_temperature ?? 0.7,
+      llm_input_type_id: body.llm_input_type_id || null,
+      llm_output_type_id: body.llm_output_type_id || null,
+      humor_flavor_step_type_id: body.humor_flavor_step_type_id || null,
     })
     .select()
     .single();
