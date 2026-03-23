@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase-admin";
+import { createClient } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -24,6 +25,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const serverClient = await createClient();
+  const { data: { user } } = await serverClient.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const supabase = createAdminClient();
   const body = await request.json();
 
@@ -50,6 +57,8 @@ export async function POST(
       llm_input_type_id: body.llm_input_type_id || null,
       llm_output_type_id: body.llm_output_type_id || null,
       humor_flavor_step_type_id: body.humor_flavor_step_type_id || null,
+      created_by_user_id: user.id,
+      modified_by_user_id: user.id,
     })
     .select()
     .single();

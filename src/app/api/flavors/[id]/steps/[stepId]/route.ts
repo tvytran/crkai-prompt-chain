@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase-admin";
+import { createClient } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
 
 export async function PATCH(
@@ -6,10 +7,16 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; stepId: string }> }
 ) {
   const { stepId } = await params;
+  const serverClient = await createClient();
+  const { data: { user } } = await serverClient.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const supabase = createAdminClient();
   const body = await request.json();
 
-  const updates: Record<string, unknown> = {};
+  const updates: Record<string, unknown> = { modified_by_user_id: user.id };
   if (body.llm_system_prompt !== undefined) updates.llm_system_prompt = body.llm_system_prompt;
   if (body.llm_user_prompt !== undefined) updates.llm_user_prompt = body.llm_user_prompt;
   if (body.description !== undefined) updates.description = body.description;
