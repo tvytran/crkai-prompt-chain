@@ -6,7 +6,7 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await params;
+  const { id: _flavorId } = await params;
   const serverClient = await createClient();
   const { data: { user } } = await serverClient.auth.getUser();
   if (!user) {
