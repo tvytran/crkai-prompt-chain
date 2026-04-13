@@ -15,6 +15,7 @@ export default function FlavorsPage() {
   const [flavors, setFlavors] = useState<HumorFlavor[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
 
   async function loadFlavors() {
     const res = await fetch("/api/flavors");
@@ -35,6 +36,26 @@ export default function FlavorsPage() {
     await fetch(`/api/flavors/${id}`, { method: "DELETE" });
     setFlavors((prev) => prev.filter((f) => f.id !== id));
     setDeleting(null);
+  }
+
+  async function handleDuplicate(id: string, slug: string) {
+    const newSlug = prompt(`Enter a unique name for the duplicated flavor:`, `${slug}-copy`);
+    if (!newSlug) return;
+
+    setDuplicating(id);
+    const res = await fetch(`/api/flavors/${id}/duplicate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: newSlug }),
+    });
+
+    if (res.ok) {
+      await loadFlavors();
+    } else {
+      const data = await res.json();
+      alert(data.error || "Failed to duplicate flavor");
+    }
+    setDuplicating(null);
   }
 
   return (
@@ -113,6 +134,13 @@ export default function FlavorsPage() {
                     >
                       Captions
                     </Link>
+                    <button
+                      onClick={() => handleDuplicate(flavor.id, flavor.slug)}
+                      disabled={duplicating === flavor.id}
+                      className="rounded-lg border border-cyan-300 dark:border-cyan-700 px-3 py-1.5 text-xs font-medium text-cyan-700 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 transition-colors disabled:opacity-50"
+                    >
+                      {duplicating === flavor.id ? "..." : "Duplicate"}
+                    </button>
                     <button
                       onClick={() => handleDelete(flavor.id, flavor.slug)}
                       disabled={deleting === flavor.id}
