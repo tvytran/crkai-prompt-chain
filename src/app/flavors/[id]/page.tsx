@@ -28,7 +28,9 @@ interface FlavorStep {
 
 interface LookupItem {
   id: number;
-  name: string;
+  slug?: string;
+  description?: string | null;
+  name?: string;
 }
 
 export default function FlavorDetailPage() {
@@ -415,7 +417,7 @@ export default function FlavorDetailPage() {
                     className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                   >
                     <option value="">Select...</option>
-                    {inputTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {inputTypes.map(t => <option key={t.id} value={t.id}>{t.slug}{t.description ? ` — ${t.description}` : ""}</option>)}
                   </select>
                 </div>
                 <div>
@@ -429,7 +431,7 @@ export default function FlavorDetailPage() {
                     className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                   >
                     <option value="">Select...</option>
-                    {outputTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {outputTypes.map(t => <option key={t.id} value={t.id}>{t.slug}{t.description ? ` — ${t.description}` : ""}</option>)}
                   </select>
                 </div>
                 <div>
@@ -468,7 +470,7 @@ export default function FlavorDetailPage() {
                       className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                     >
                       <option value="">None</option>
-                      {stepTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      {stepTypes.map(t => <option key={t.id} value={t.id}>{t.slug}{t.description ? ` — ${t.description}` : ""}</option>)}
                     </select>
                   </div>
                 )}
