@@ -26,6 +26,11 @@ interface FlavorStep {
   humor_flavor_step_type_id: number | null;
 }
 
+interface LookupItem {
+  id: number;
+  name: string;
+}
+
 export default function FlavorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [flavor, setFlavor] = useState<HumorFlavor | null>(null);
@@ -47,6 +52,12 @@ export default function FlavorDetailPage() {
     llm_temperature: "0.7",
   });
 
+  // Lookup tables
+  const [inputTypes, setInputTypes] = useState<LookupItem[]>([]);
+  const [outputTypes, setOutputTypes] = useState<LookupItem[]>([]);
+  const [stepTypes, setStepTypes] = useState<LookupItem[]>([]);
+  const [models, setModels] = useState<LookupItem[]>([]);
+
   // New step form
   const [showNewStep, setShowNewStep] = useState(false);
   const [newStepError, setNewStepError] = useState<string | null>(null);
@@ -56,19 +67,35 @@ export default function FlavorDetailPage() {
     description: "",
     llm_model_id: "",
     llm_temperature: "0.7",
+    llm_input_type_id: "",
+    llm_output_type_id: "",
+    humor_flavor_step_type_id: "",
   });
 
   const loadData = useCallback(async () => {
-    const [flavorRes, stepsRes] = await Promise.all([
+    const [flavorRes, stepsRes, lookupRes] = await Promise.all([
       fetch(`/api/flavors/${id}`),
       fetch(`/api/flavors/${id}/steps`),
+      fetch(`/api/lookup`),
     ]);
     const flavorData = await flavorRes.json();
     const stepsData = await stepsRes.json();
+    const lookupData = await lookupRes.json();
     setFlavor(flavorData);
     setSlug(flavorData.slug || "");
     setDescription(flavorData.description || "");
     setSteps(Array.isArray(stepsData) ? stepsData : []);
+    setInputTypes(lookupData.inputTypes ?? []);
+    setOutputTypes(lookupData.outputTypes ?? []);
+    setStepTypes(lookupData.stepTypes ?? []);
+    setModels(lookupData.models ?? []);
+    // Default new step to first available values
+    if (lookupData.inputTypes?.length > 0) {
+      setNewStep(prev => ({ ...prev, llm_input_type_id: String(lookupData.inputTypes[0].id) }));
+    }
+    if (lookupData.outputTypes?.length > 0) {
+      setNewStep(prev => ({ ...prev, llm_output_type_id: String(lookupData.outputTypes[0].id) }));
+    }
     setLoading(false);
   }, [id]);
 
@@ -106,6 +133,9 @@ export default function FlavorDetailPage() {
       body: JSON.stringify({
         ...newStep,
         llm_model_id: newStep.llm_model_id ? parseInt(newStep.llm_model_id) : null,
+        llm_input_type_id: newStep.llm_input_type_id ? parseInt(newStep.llm_input_type_id) : null,
+        llm_output_type_id: newStep.llm_output_type_id ? parseInt(newStep.llm_output_type_id) : null,
+        humor_flavor_step_type_id: newStep.humor_flavor_step_type_id ? parseInt(newStep.humor_flavor_step_type_id) : null,
         llm_temperature: parseFloat(newStep.llm_temperature) || 0.7,
       }),
     });
@@ -116,6 +146,9 @@ export default function FlavorDetailPage() {
         description: "",
         llm_model_id: "",
         llm_temperature: "0.7",
+        llm_input_type_id: inputTypes[0] ? String(inputTypes[0].id) : "",
+        llm_output_type_id: outputTypes[0] ? String(outputTypes[0].id) : "",
+        humor_flavor_step_type_id: "",
       });
       setNewStepError(null);
       setShowNewStep(false);
@@ -373,32 +406,72 @@ export default function FlavorDetailPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    LLM Model ID
+                    Input Type <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
+                    value={newStep.llm_input_type_id}
+                    onChange={(e) => setNewStep({ ...newStep, llm_input_type_id: e.target.value })}
+                    required
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="">Select...</option>
+                    {inputTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Output Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newStep.llm_output_type_id}
+                    onChange={(e) => setNewStep({ ...newStep, llm_output_type_id: e.target.value })}
+                    required
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="">Select...</option>
+                    {outputTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    LLM Model
+                  </label>
+                  <select
                     value={newStep.llm_model_id}
-                    onChange={(e) =>
-                      setNewStep({ ...newStep, llm_model_id: e.target.value })
-                    }
-                    placeholder="e.g. 1"
-                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                  />
+                    onChange={(e) => setNewStep({ ...newStep, llm_model_id: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="">Default</option>
+                    {models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Temperature
                   </label>
                   <input
-                    type="text"
+                    type="number"
+                    min="0" max="2" step="0.1"
                     value={newStep.llm_temperature}
-                    onChange={(e) =>
-                      setNewStep({ ...newStep, llm_temperature: e.target.value })
-                    }
-                    placeholder="0.7"
-                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                    onChange={(e) => setNewStep({ ...newStep, llm_temperature: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
+                {stepTypes.length > 0 && (
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Step Type
+                    </label>
+                    <select
+                      value={newStep.humor_flavor_step_type_id}
+                      onChange={(e) => setNewStep({ ...newStep, humor_flavor_step_type_id: e.target.value })}
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                    >
+                      <option value="">None</option>
+                      {stepTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
             {newStepError && (
