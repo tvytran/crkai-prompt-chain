@@ -49,6 +49,7 @@ export default function FlavorDetailPage() {
 
   // New step form
   const [showNewStep, setShowNewStep] = useState(false);
+  const [newStepError, setNewStepError] = useState<string | null>(null);
   const [newStep, setNewStep] = useState({
     llm_system_prompt: "",
     llm_user_prompt: "",
@@ -98,11 +99,13 @@ export default function FlavorDetailPage() {
   async function handleCreateStep(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setNewStepError(null);
     const res = await fetch(`/api/flavors/${id}/steps`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...newStep,
+        llm_model_id: newStep.llm_model_id ? parseInt(newStep.llm_model_id) : null,
         llm_temperature: parseFloat(newStep.llm_temperature) || 0.7,
       }),
     });
@@ -114,8 +117,12 @@ export default function FlavorDetailPage() {
         llm_model_id: "",
         llm_temperature: "0.7",
       });
+      setNewStepError(null);
       setShowNewStep(false);
       await loadData();
+    } else {
+      const data = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
+      setNewStepError(data.error || `Failed to add step (${res.status})`);
     }
     setSaving(false);
   }
@@ -394,6 +401,11 @@ export default function FlavorDetailPage() {
                 </div>
               </div>
             </div>
+            {newStepError && (
+              <div className="mt-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+                {newStepError}
+              </div>
+            )}
             <button
               type="submit"
               disabled={saving}
